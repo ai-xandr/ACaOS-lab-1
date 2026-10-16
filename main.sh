@@ -91,15 +91,13 @@ SELECTED_COUNT=0
 while IFS="" read -r -d '' FILE_DATA; do # -r - без экранирования, -d - разделитель нулевой байт
     FILE_PATH="${FILE_DATA#* }" # regex - берем то что после первого пробела
 
-    [[ -f "$FILE_PATH" ]] || continue
-
     FILE_SIZE_BYTES=$(stat -c '%s' -- "$FILE_PATH")
 
-    FILE_SIZE_KB=$(( (FILE_SIZE_BYTES + 1023) / 1024 ))
+    FILE_SIZE_KB=$(( (FILE_SIZE_BYTES + 1023) / 1024 )) # округление вверх
 
     RELATIVE_PATH="${FILE_PATH#"$LOG_DIR"/}"
 
-    printf '%s\0' "$RELATIVE_PATH" >> "$SELECTED_LIST"
+    printf '%s\0' "$RELATIVE_PATH" >> "$SELECTED_LIST" # > - перезапись файла, >> - дозапись
 
     SELECTED_SIZE_KB=$(( SELECTED_SIZE_KB + FILE_SIZE_KB ))
     SELECTED_COUNT=$(( SELECTED_COUNT + 1 ))
@@ -110,3 +108,31 @@ while IFS="" read -r -d '' FILE_DATA; do # -r - без экранировани�
 
 done
  } < "$FILE_LIST"
+
+
+if (( SELECTED_COUNT == 0 )); then # для защиты от кейса когда ос помечает файлы как удаленные но не удаляет
+    error "no files available for archiving"
+fi
+
+if (( SELECTED_SIZE_KB < NEEDED_FREE_KB )); then
+    error "not enough files to reach the threshold"
+fi
+
+echo "Selected  : $SELECTED_COUNT file(s)"
+echo "Data      : ${SELECTED_SIZE_KB} KiB"
+
+echo "Selected files to archive:"
+
+{
+    while IFS="" read -r -d '' RELATIVE_PATH; do
+        echo "-$RELATIVE_PATH"
+    done
+} < "$SELECTED_LIST"
+
+
+TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+
+
+echo "Creating  : $BACKUP_DIR"
+
+tar --create "$TAR_COMPRESSION_OPTION" --file="$TMP_DIR" --directory="$LOG_DIR" --null --verbatim-files-from --files-from="$SELECTED_LIST"
