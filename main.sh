@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-
+# функции
 usage() {
     echo "Incorrect usage; Gotta be: $0 <log_dir> <threshold_percent> <backup_dir>"
     exit 1
@@ -36,7 +36,8 @@ if [[ "${LAB1_MAX_COMPRESSION:-0}" == "1" ]]; then
     ARCHIVE_SUFFIX="tar.lzma"
     TAR_COMPRESSION_OPTION="--lzma"
 fi
-    
+
+# подсчет размера логов 
 { read -r _; read -r _ TOTAL_KB _; } < <(df -P -k "$LOG_DIR")
 
 read -r DIR_USED_KB _ < <(du -s -k "$LOG_DIR")
@@ -64,3 +65,48 @@ echo "Threshold exceeded. Selecting oldest files..."
 
 TARGET_USED_KB=$(( TOTAL_KB * THRESHOLD / 100 ))
 NEEDED_FREE_KB=$(( USED_KB - TARGET_USED_KB ))
+
+TMP_DIR=$(mktemp -d)
+
+remove_temp_dir() {
+    if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
+    fi
+}
+
+trap remove_temp_dir EXIT # типа defer
+
+FILE_LIST="$TMP_DIR/files"
+SELECTED_LIST="$TMP_DIR/selected"
+
+touch "$SELECTED_LIST"
+
+# type f - искать только файлы, -printf `%T@ %p\0` - вывод формата <timestamp> <path><null-байт>
+find "$LOG_DIR" -type f -printf '%T@ %p\0' | sort --zero-terminated --numeric-sort > "$FILE_LIST"
+
+SELECTED_SIZE_KB=0
+SELECTED_COUNT=0
+
+{
+while IFS="" read -r -d '' FILE_DATA; do # -r - без экранирования, -d - разделитель нулевой байт
+    FILE_PATH="${FILE_DATA#* }" # regex - берем то что после первого пробела
+
+    [[ -f "$FILE_PATH" ]] || continue
+
+    FILE_SIZE_BYTES=$(stat -c '%s' -- "$FILE_PATH")
+
+    FILE_SIZE_KB=$(( (FILE_SIZE_BYTES + 1023) / 1024 ))
+
+    RELATIVE_PATH="${FILE_PATH#"$LOG_DIR"/}"
+
+    printf '%s\0' "$RELATIVE_PATH" >> "$SELECTED_LIST"
+
+    SELECTED_SIZE_KB=$(( SELECTED_SIZE_KB + FILE_SIZE_KB ))
+    SELECTED_COUNT=$(( SELECTED_COUNT + 1 ))
+
+    if (( SELECTED_SIZE_KB >= NEEDED_FREE_KB )); then
+        break
+    fi
+
+done
+ } < "$FILE_LIST"
