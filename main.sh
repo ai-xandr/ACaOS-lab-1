@@ -91,9 +91,7 @@ SELECTED_COUNT=0
 while IFS="" read -r -d '' FILE_DATA; do # -r - без экранирования, -d - разделитель нулевой байт
     FILE_PATH="${FILE_DATA#* }" # regex - берем то что после первого пробела
 
-    FILE_SIZE_BYTES=$(stat -c '%s' -- "$FILE_PATH")
-
-    FILE_SIZE_KB=$(( (FILE_SIZE_BYTES + 1023) / 1024 )) # округление вверх
+    read -r FILE_SIZE_KB _ < <(du -s -k -- "$FILE_PATH")
 
     RELATIVE_PATH="${FILE_PATH#"$LOG_DIR"/}"
 
@@ -130,15 +128,16 @@ echo "Selected files to archive:"
 } < "$SELECTED_LIST"
 
 
-
+TARGET_ARCHIVE_NAME="${BACKUP_DIR}/archived.${ARCHIVE_SUFFIX}"
+ARCHIVE_TEMP="${TMP_DIR}/archived.${ARCHIVE_SUFFIX}"
 
 echo "Creating: $BACKUP_DIR"
 
-tar --create "$TAR_COMPRESSION_OPTION" --file="$TMP_DIR" --directory="$LOG_DIR" --null --verbatim-files-from --files-from="$SELECTED_LIST"
+tar --create "$TAR_COMPRESSION_OPTION" --file="$ARCHIVE_TEMP" --directory="$LOG_DIR" --null --verbatim-files-from --files-from="$SELECTED_LIST" --list "$TAR_COMPRESSION_OPTION"
 
-tar --list --file="$TEMP_ARCHIVE" >/dev/null
+tar --list --file="$ARCHIVE_TEMP" >/dev/null
 
-mv "$TEMP_ARCHIVE" "$ARCHIVE_PATH"
+mv "$ARCHIVE_TEMP" "$TARGET_ARCHIVE_NAME"
 
 echo "Archivated successfully"
 
