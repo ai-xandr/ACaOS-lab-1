@@ -44,7 +44,7 @@ read -r DIR_USED_KB _ < <(du -s -k "$LOG_DIR")
 
 [[ -n "$TOTAL_KB" ]] || error "failed to get directory size"
 
-USED_PERCENT=$(( USED_KB * 10000 / TOTAL_KB ))
+USED_PERCENT=$(( DIR_USED_KB * 10000 / TOTAL_KB ))
 
 USED_PERCENT_INT=$(( USED_PERCENT / 100 ))
 USED_PERCENT_FRAC=$(( USED_PERCENT % 100 ))
@@ -64,7 +64,7 @@ echo "Threshold exceeded. Selecting oldest files..."
 
 
 TARGET_USED_KB=$(( TOTAL_KB * THRESHOLD / 100 ))
-NEEDED_FREE_KB=$(( USED_KB - TARGET_USED_KB ))
+NEEDED_FREE_KB=$(( DIR_USED_KB - TARGET_USED_KB ))
 
 TMP_DIR=$(mktemp -d)
 
