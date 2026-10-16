@@ -56,7 +56,7 @@ echo "Mode      : $COMPRESSION"
 
 
 if (( USED_PERCENT <= THRESHOLD * 100 )); then
-    echo "${USED_PERCENT_INT}.${USED_PERCENT_FRAC}% <= ${THRESHOLD}%; hence nothing to archive."
+    echo "${USED_PERCENT_INT}.${USED_PERCENT_FRAC}% <= ${THRESHOLD}%; hence nothing to archive"
     exit 0
 fi
 
@@ -130,9 +130,20 @@ echo "Selected files to archive:"
 } < "$SELECTED_LIST"
 
 
-TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 
 
-echo "Creating  : $BACKUP_DIR"
+echo "Creating: $BACKUP_DIR"
 
 tar --create "$TAR_COMPRESSION_OPTION" --file="$TMP_DIR" --directory="$LOG_DIR" --null --verbatim-files-from --files-from="$SELECTED_LIST"
+
+tar --list --file="$TEMP_ARCHIVE" >/dev/null
+
+mv "$TEMP_ARCHIVE" "$ARCHIVE_PATH"
+
+echo "Archivated successfully"
+
+{
+while IFS= read -r -d '' RELATIVE_PATH; do
+    rm -f "$LOG_DIR/$RELATIVE_PATH"
+done 
+}< "$SELECTED_LIST"
