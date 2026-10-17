@@ -56,7 +56,7 @@ echo "Mode      : $COMPRESSION"
 
 
 if (( USED_PERCENT <= THRESHOLD * 100 )); then
-    echo "${USED_PERCENT_INT}.${USED_PERCENT_FRAC}% <= ${THRESHOLD}%; hence nothing to archive"
+    echo "${USED_PERCENT_INT}.${USED_PERCENT_FRAC}\% <=${THRESHOLD}%; hence nothing to archive"
     exit 0
 fi
 
@@ -82,7 +82,7 @@ SELECTED_LIST="$TMP_DIR/selected"
 touch "$SELECTED_LIST"
 
 # type f - искать только файлы, -printf `%T@ %p\0` - вывод формата <timestamp> <path><null-байт>
-find "$LOG_DIR" -type f -printf '%T@ %p\0' | sort --zero-terminated --numeric-sort > "$FILE_LIST"
+find "$LOG_DIR" -name "lost+found" -prune -o -type f -printf '%T@ %p\0' 2>/dev/null | sort --zero-terminated --numeric-sort > "$FILE_LIST"
 
 SELECTED_SIZE_KB=0
 SELECTED_COUNT=0
@@ -112,10 +112,6 @@ if (( SELECTED_COUNT == 0 )); then # для защиты от кейса ког�
     error "no files available for archiving"
 fi
 
-if (( SELECTED_SIZE_KB < NEEDED_FREE_KB )); then
-    error "not enough files to reach the threshold"
-fi
-
 echo "Selected  : $SELECTED_COUNT file(s)"
 echo "Data      : ${SELECTED_SIZE_KB} KiB"
 
@@ -131,9 +127,14 @@ echo "Selected files to archive:"
 TARGET_ARCHIVE_NAME="${BACKUP_DIR}/archived.${ARCHIVE_SUFFIX}"
 ARCHIVE_TEMP="${TMP_DIR}/archived.${ARCHIVE_SUFFIX}"
 
-echo "Creating: $BACKUP_DIR"
+echo "Creating: $TARGET_ARCHIVE_NAME"
 
-tar --create "$TAR_COMPRESSION_OPTION" --file="$ARCHIVE_TEMP" --directory="$LOG_DIR" --null --verbatim-files-from --files-from="$SELECTED_LIST" --list "$TAR_COMPRESSION_OPTION"
+tar --create "$TAR_COMPRESSION_OPTION" \
+    --file="$ARCHIVE_TEMP" \
+    --directory="$LOG_DIR" \
+    --null \
+    --verbatim-files-from \
+    --files-from="$SELECTED_LIST"
 
 tar --list --file="$ARCHIVE_TEMP" >/dev/null
 
